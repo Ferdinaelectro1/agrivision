@@ -1,0 +1,27 @@
+lib/
+├── main.dart
+├── firebase_options.dart
+│
+├── features/
+│   ├── auth/
+│   │   ├── screens/
+│   │   │   ├── login_screen.dart
+│   │   │   └── register_screen.dart
+│   │   ├── widgets/
+│   │   │   └── auth_form.dart
+│   │   └── services/
+│   │       └── auth_service.dart
+│   │
+│   └── home/
+│       ├── screens/
+│       │   └── home_screen.dart
+│       └── widgets/
+│           └── home_widgets.dart
+│
+├── core/
+│   ├── widgets/          # boutons, loaders réutilisables partout
+│   ├── theme/            # couleurs, textStyles, ThemeData
+│   └── utils/            # helpers, constantes
+│
+└── router/
+    └── app_router.dart   # gestion navigation (si tu utilises go_router par ex.)
