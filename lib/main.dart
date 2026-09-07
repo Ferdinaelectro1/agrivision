@@ -4,10 +4,10 @@ import 'features/auth/services/auth_service.dart';
 import 'features/auth/services/fake_auth_service.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen.dart';
-import 'features/home/screens/home_screen.dart';
+import 'features/dashboard/screens/home_screen.dart'; // <- changé ici
 
 void main() {
-  runApp(MyApp(authService: FakeAuthService())); // <- on remplacera par FirebaseAuthServiceImpl() plus tard
+  runApp(MyApp(authService: FakeAuthService()));
 }
 
 class MyApp extends StatelessWidget {

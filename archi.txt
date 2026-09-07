@@ -25,3 +25,25 @@ lib/
 │
 └── router/
     └── app_router.dart   # gestion navigation (si tu utilises go_router par ex.)
+
+
+lib/features/
+├── dashboard/
+│   └── screens/
+│       └── home_screen.dart        # le hub, 4 tuiles vers les features
+│
+├── diagnosis/                       # diagnostic de plantes (photo → LLM)
+│   ├── screens/diagnosis_screen.dart
+│   └── services/diagnosis_service.dart  # interface, impl locale/LLM plus tard
+│
+├── prediction/                      # prédiction d'intrants
+│   ├── screens/prediction_screen.dart
+│   └── services/prediction_service.dart
+│
+├── history/                         # historique des actions passées
+│   ├── screens/history_screen.dart
+│   └── models/history_entry.dart
+│
+└── bug_report/                      # signalement de bugs
+    ├── screens/bug_report_screen.dart
+    └── services/bug_report_service.dart
