@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/diagnosis_service.dart';
-import '../services/fake_diagnosis_service.dart';
+import '../services/tflite_diagnosis_service.dart';
 
 class DiagnosisScreen extends StatefulWidget {
   const DiagnosisScreen({super.key});
@@ -13,7 +13,7 @@ class DiagnosisScreen extends StatefulWidget {
 }
 
 class _DiagnosisScreenState extends State<DiagnosisScreen> {
-  final DiagnosisService _service = FakeDiagnosisService(); // sera remplacé par le vrai LLM local
+  final DiagnosisService _service = TFLiteDiagnosisService(); // sera remplacé par le vrai LLM local
   final ImagePicker _picker = ImagePicker();
 
   File? _selectedImage;
