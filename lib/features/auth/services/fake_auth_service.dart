@@ -28,4 +28,10 @@ class FakeAuthService implements AuthService {
   Future<void> signOut() async {
     _controller.add(null);
   }
+
+  @override
+  Future<void> signInWithGoogle() async {
+    await Future.delayed(const Duration(milliseconds: 800));
+    _controller.add(AppUser(uid: 'fake-google-uid', email: 'user@gmail.com'));
+  }
 }
