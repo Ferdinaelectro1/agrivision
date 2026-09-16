@@ -26,7 +26,7 @@ class HomeScreen extends StatelessWidget {
               titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
               title: const Text(
                 "AgriVision",
-                style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.2),
+                style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.2,color: Colors.white),
               ),
               background: Container(
                 decoration: const BoxDecoration(
