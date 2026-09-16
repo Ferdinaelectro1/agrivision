@@ -1,4 +1,4 @@
-package com.example.agrivision
+package com.group.agrivision
 
 import io.flutter.embedding.android.FlutterActivity
 

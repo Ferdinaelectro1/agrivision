@@ -1,6 +1,7 @@
 // lib/features/auth/screens/login_screen.dart
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class LoginScreen extends StatefulWidget {
   final AuthService authService;
@@ -27,6 +28,19 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } catch (e) {
       setState(() => _error = "Échec de connexion. Vérifie tes identifiants.");
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _googleSubmit() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      await widget.authService.signInWithGoogle();
+    } catch (e, st) {
+      debugPrint('GOOGLE SIGNIN ERROR: $e');
+      debugPrint('$st');
+      setState(() => _error = "Connexion Google échouée : $e");
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -91,6 +105,26 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: _loading
                       ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Text("Se connecter"),
+                ),
+                const SizedBox(height: 12),
+                const Row(children: [
+                  Expanded(child: Divider()),
+                  Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text("ou")),
+                  Expanded(child: Divider()),
+                ]),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _loading ? null : _googleSubmit,
+                  icon: SvgPicture.asset(
+                    'assets/icons/google_logo.svg',
+                    height: 20,
+                    width: 20,
+                  ),
+                  label: const Text("Continuer avec Google"),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pushNamed(context, '/register'),

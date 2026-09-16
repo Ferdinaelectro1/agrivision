@@ -3,6 +3,7 @@ abstract class AuthService {
   Future<void> signIn({required String email, required String password});
   Future<void> signUp({required String email, required String password});
   Future<void> signOut();
+  Future<void> signInWithGoogle();
 }
 
 class AppUser {
