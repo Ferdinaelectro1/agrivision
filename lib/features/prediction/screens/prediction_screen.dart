@@ -2,7 +2,72 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../services/prediction_service.dart';
-import '../services/fake_prediction_service.dart';
+import '../services/tflite_prediction_service.dart';
+import 'prediction_result_screen.dart';
+
+// ───────────── Libellés courts (pour tenir sur 2 colonnes) ─────────────
+const _soilLabels = {
+  SoilType.clay: "Argileux",
+  SoilType.loamy: "Franc",
+  SoilType.sandy: "Sableux",
+  SoilType.silt: "Limoneux",
+};
+const _stageLabels = {
+  GrowthStage.sowing: "Semis",
+  GrowthStage.vegetative: "Croissance",
+  GrowthStage.flowering: "Floraison",
+  GrowthStage.harvest: "Récolte",
+};
+const _seasonLabels = {
+  Season.kharif: "Kharif (pluies)",
+  Season.rabi: "Rabi (fraîche)",
+  Season.zaid: "Zaid (chaude)",
+};
+const _irrigationLabels = {
+  IrrigationType.canal: "Canal",
+  IrrigationType.drip: "Goutte à goutte",
+  IrrigationType.rainfed: "Pluvial",
+  IrrigationType.sprinkler: "Aspersion",
+};
+const _previousCropLabels = {
+  PreviousCrop.cotton: "Coton",
+  PreviousCrop.maize: "Maïs",
+  PreviousCrop.potato: "Pomme de terre",
+  PreviousCrop.rice: "Riz",
+  PreviousCrop.sugarcane: "Canne à sucre",
+  PreviousCrop.tomato: "Tomate",
+  PreviousCrop.wheat: "Blé",
+};
+const _regionLabels = {
+  Region.central: "Centre",
+  Region.east: "Est",
+  Region.north: "Nord",
+  Region.south: "Sud",
+  Region.west: "Ouest",
+};
+
+// Champ numérique avec sa plage valide (plages vues à l'entraînement).
+class _NumSpec {
+  final String label;
+  final String? suffix;
+  final double min;
+  final double max;
+  final TextEditingController ctrl = TextEditingController();
+  _NumSpec(this.label, this.min, this.max, {this.suffix});
+
+  double get value => double.parse(ctrl.text.replaceAll(',', '.'));
+
+  static String _fmt(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toString();
+
+  String? validate(String? v) {
+    if (v == null || v.isEmpty) return "Requis";
+    final p = double.tryParse(v.replaceAll(',', '.'));
+    if (p == null) return "Invalide";
+    if (p < min || p > max) return "${_fmt(min)}–${_fmt(max)}";
+    return null;
+  }
+}
 
 class PredictionScreen extends StatefulWidget {
   const PredictionScreen({super.key});
@@ -12,55 +77,221 @@ class PredictionScreen extends StatefulWidget {
 }
 
 class _PredictionScreenState extends State<PredictionScreen> {
-  final PredictionService _service = FakePredictionService(); // remplacé par le vrai modèle plus tard
+  final TflitePredictionService _service = TflitePredictionService();
   final _formKey = GlobalKey<FormState>();
-  final _surfaceCtrl = TextEditingController();
 
-  PlantationType _selectedType = PlantationType.mais;
-  PredictionResult? _result;
+  final _ph = _NumSpec("pH du sol", 4.5, 8.5);
+  final _moisture = _NumSpec("Humidité sol", 10, 60, suffix: "%");
+  final _carbon = _NumSpec("Carbone org.", 0.2, 1.5, suffix: "%");
+  final _ec = _NumSpec("Conductivité", 0.1, 3.0, suffix: "dS/m");
+  final _n = _NumSpec("Azote", 20, 159);
+  final _p = _NumSpec("Phosphore", 10, 89);
+  final _k = _NumSpec("Potassium", 10, 119);
+  final _temp = _NumSpec("Température", 10, 40, suffix: "°C");
+  final _humidity = _NumSpec("Humidité air", 30, 90, suffix: "%");
+  final _rain = _NumSpec("Pluie", 200, 3000, suffix: "mm");
+
+  SoilType _soil = SoilType.loamy;
+  PlantationType _crop = PlantationType.mais;
+  GrowthStage _stage = GrowthStage.vegetative;
+  Season _season = Season.kharif;
+  IrrigationType _irrigation = IrrigationType.rainfed;
+  PreviousCrop _previous = PreviousCrop.maize;
+  Region _region = Region.central;
+
   bool _loading = false;
-  String? _error;
+
+  List<_NumSpec> get _allNum =>
+      [_ph, _moisture, _carbon, _ec, _n, _p, _k, _temp, _humidity, _rain];
+
+  @override
+  void dispose() {
+    for (final s in _allNum) {
+      s.ctrl.dispose();
+    }
+    _service.dispose();
+    super.dispose();
+  }
 
   Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
-    setState(() { _loading = true; _error = null; _result = null; });
+    setState(() => _loading = true);
 
     try {
-      final result = await _service.predict(
-        type: _selectedType,
-        surfaceM2: double.parse(_surfaceCtrl.text.replaceAll(',', '.')),
+      final input = FertilizerInput(
+        soilType: _soil,
+        soilPh: _ph.value,
+        soilMoisture: _moisture.value,
+        organicCarbon: _carbon.value,
+        electricalConductivity: _ec.value,
+        nitrogen: _n.value,
+        phosphorus: _p.value,
+        potassium: _k.value,
+        temperature: _temp.value,
+        humidity: _humidity.value,
+        rainfall: _rain.value,
+        cropType: _crop,
+        growthStage: _stage,
+        season: _season,
+        irrigation: _irrigation,
+        previousCrop: _previous,
+        region: _region,
       );
-      setState(() => _result = result);
+
+      final result = await _service.predict(input);
+      // L'inférence est quasi instantanée : on laisse le spinner visible un instant.
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => PredictionResultScreen(result: result)),
+      );
     } catch (e) {
-      setState(() => _error = "Erreur lors du calcul. Réessaie.");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Erreur lors du calcul. Réessaie."),
+            backgroundColor: AppColors.rust,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  InputDecoration _fieldDecoration(String label, {String? suffix}) {
+  // ───────────── Briques de formulaire compactes ─────────────
+  InputDecoration _dec(String label, {String? suffix}) {
+    OutlineInputBorder border(Color c, [double w = 1]) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: c, width: w),
+        );
     return InputDecoration(
       labelText: label,
       suffixText: suffix,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
       filled: true,
       fillColor: Colors.white,
-      labelStyle: const TextStyle(color: AppColors.inkSoft),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: AppColors.sandDark),
+      labelStyle: const TextStyle(color: AppColors.inkSoft, fontSize: 13),
+      errorStyle: const TextStyle(fontSize: 10, height: 1),
+      border: border(AppColors.sandDark),
+      enabledBorder: border(AppColors.sandDark),
+      focusedBorder: border(AppColors.gold, 1.6),
+      errorBorder: border(AppColors.rust),
+      focusedErrorBorder: border(AppColors.rust, 1.6),
+    );
+  }
+
+  Widget _num(_NumSpec s) {
+    return TextFormField(
+      controller: s.ctrl,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      textInputAction: TextInputAction.next,
+      style: const TextStyle(fontSize: 14),
+      decoration: _dec(s.label, suffix: s.suffix),
+      validator: s.validate,
+    );
+  }
+
+  Widget _dropdown<T>({
+    required String label,
+    required T value,
+    required Map<T, String> labels,
+    required ValueChanged<T> onChanged,
+  }) {
+    return DropdownButtonFormField<T>(
+      value: value,
+      isExpanded: true,
+      decoration: _dec(label),
+      style: const TextStyle(fontSize: 13, color: Colors.black87),
+      items: labels.entries
+          .map((e) => DropdownMenuItem<T>(
+                value: e.key,
+                child: Text(e.value, overflow: TextOverflow.ellipsis),
+              ))
+          .toList(),
+      onChanged: (v) {
+        if (v != null) setState(() => onChanged(v));
+      },
+    );
+  }
+
+  Widget _row(List<Widget> children) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Expanded(child: children[i]),
+        ],
+      ],
+    );
+  }
+
+  Widget _caption(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 6),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          color: AppColors.forest,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+        ),
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: AppColors.sandDark),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: AppColors.gold, width: 1.6),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: AppColors.rust),
-      ),
+    );
+  }
+
+  // Bouton qui se transforme en cercle avec un spinner pendant l'inférence.
+  Widget _submitButton() {
+    const size = 52.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Center(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            width: _loading ? size : constraints.maxWidth,
+            height: size,
+            child: ElevatedButton(
+              onPressed: _loading ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.forest,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.forest,
+                disabledForegroundColor: Colors.white,
+                minimumSize: Size.zero,
+                padding: EdgeInsets.zero,
+                elevation: 0,
+                shape: _loading
+                    ? const CircleBorder()
+                    : RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: _loading
+                    ? const SizedBox(
+                        key: ValueKey('spinner'),
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                      )
+                    : const Text(
+                        "Recommander",
+                        key: ValueKey('label'),
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.clip,
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                      ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -71,158 +302,83 @@ class _PredictionScreenState extends State<PredictionScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.forest,
         foregroundColor: Colors.white,
-        title: const Text("Prédiction d'intrants", style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text("Recommandation d'engrais", style: TextStyle(fontWeight: FontWeight.w700)),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.gold.withOpacity(0.14),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.calculate_outlined, color: AppColors.gold, size: 22),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _caption("Sol"),
+                _row([
+                  _dropdown<SoilType>(
+                    label: "Type de sol",
+                    value: _soil,
+                    labels: _soilLabels,
+                    onChanged: (v) => _soil = v,
                   ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      "Renseigne ta parcelle pour estimer la quantité d'intrants nécessaire",
-                      style: TextStyle(color: AppColors.inkSoft, fontSize: 13.5),
-                    ),
+                  _num(_ph),
+                ]),
+                const SizedBox(height: 10),
+                _row([_num(_moisture), _num(_carbon), _num(_ec)]),
+                _caption("Nutriments du sol · kg/ha"),
+                _row([_num(_n), _num(_p), _num(_k)]),
+                _caption("Climat"),
+                _row([_num(_temp), _num(_humidity), _num(_rain)]),
+                _caption("Culture"),
+                _row([
+                  _dropdown<PlantationType>(
+                    label: "Plantation",
+                    value: _crop,
+                    labels: {for (final t in PlantationType.values) t: t.label},
+                    onChanged: (v) => _crop = v,
                   ),
-                ],
-              ),
-              const SizedBox(height: 28),
-              DropdownButtonFormField<PlantationType>(
-                value: _selectedType,
-                decoration: _fieldDecoration("Type de plantation"),
-                items: PlantationType.values
-                    .map((type) => DropdownMenuItem(value: type, child: Text(type.label)))
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) setState(() => _selectedType = value);
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _surfaceCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: _fieldDecoration("Surface", suffix: "m²"),
-                validator: (v) {
-                  if (v == null || v.isEmpty) return "Renseigne une surface";
-                  final parsed = double.tryParse(v.replaceAll(',', '.'));
-                  if (parsed == null || parsed <= 0) return "Valeur invalide";
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _loading ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.forest,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    elevation: 0,
+                  _dropdown<GrowthStage>(
+                    label: "Stade",
+                    value: _stage,
+                    labels: _stageLabels,
+                    onChanged: (v) => _stage = v,
                   ),
-                  child: _loading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text("Calculer", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                ),
-              ),
-              const SizedBox(height: 24),
-              if (_error != null)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.rust.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                ]),
+                const SizedBox(height: 10),
+                _row([
+                  _dropdown<Season>(
+                    label: "Saison",
+                    value: _season,
+                    labels: _seasonLabels,
+                    onChanged: (v) => _season = v,
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline, color: AppColors.rust, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(_error!, style: const TextStyle(color: AppColors.rust))),
-                    ],
+                  _dropdown<IrrigationType>(
+                    label: "Irrigation",
+                    value: _irrigation,
+                    labels: _irrigationLabels,
+                    onChanged: (v) => _irrigation = v,
                   ),
-                ),
-              if (_result != null) _PredictionResultCard(result: _result!),
-            ],
+                ]),
+                const SizedBox(height: 10),
+                _row([
+                  _dropdown<PreviousCrop>(
+                    label: "Culture précédente",
+                    value: _previous,
+                    labels: _previousCropLabels,
+                    onChanged: (v) => _previous = v,
+                  ),
+                  _dropdown<Region>(
+                    label: "Région",
+                    value: _region,
+                    labels: _regionLabels,
+                    onChanged: (v) => _region = v,
+                  ),
+                ]),
+                const SizedBox(height: 20),
+                _submitButton(),
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _PredictionResultCard extends StatelessWidget {
-  final PredictionResult result;
-  const _PredictionResultCard({required this.result});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.forest, AppColors.forestLight],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.forest.withOpacity(0.3),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.eco_outlined, color: Colors.white, size: 18),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  result.intrantName,
-                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            "${result.quantityNeeded.toStringAsFixed(2)} ${result.unit}",
-            style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            result.note,
-            style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13),
-          ),
-        ],
       ),
     );
   }
