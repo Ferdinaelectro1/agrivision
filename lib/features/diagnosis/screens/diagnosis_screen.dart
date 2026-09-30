@@ -1,7 +1,6 @@
 
 
 
-Diagnosis screen · DART
 // lib/features/diagnosis/screens/diagnosis_screen.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
