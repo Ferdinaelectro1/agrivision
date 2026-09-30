@@ -1,10 +1,14 @@
+
+
+
 // lib/features/prediction/screens/prediction_screen.dart
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../services/prediction_service.dart';
 import '../services/tflite_prediction_service.dart';
+import '../../history/services/history_service.dart';
 import 'prediction_result_screen.dart';
-
+ 
 // ───────────── Libellés courts (pour tenir sur 2 colonnes) ─────────────
 const _soilLabels = {
   SoilType.clay: "Argileux",
@@ -45,7 +49,7 @@ const _regionLabels = {
   Region.south: "Sud",
   Region.west: "Ouest",
 };
-
+ 
 // Champ numérique avec sa plage valide (plages vues à l'entraînement).
 class _NumSpec {
   final String label;
@@ -54,12 +58,12 @@ class _NumSpec {
   final double max;
   final TextEditingController ctrl = TextEditingController();
   _NumSpec(this.label, this.min, this.max, {this.suffix});
-
+ 
   double get value => double.parse(ctrl.text.replaceAll(',', '.'));
-
+ 
   static String _fmt(double v) =>
       v == v.roundToDouble() ? v.toInt().toString() : v.toString();
-
+ 
   String? validate(String? v) {
     if (v == null || v.isEmpty) return "Requis";
     final p = double.tryParse(v.replaceAll(',', '.'));
@@ -68,18 +72,18 @@ class _NumSpec {
     return null;
   }
 }
-
+ 
 class PredictionScreen extends StatefulWidget {
   const PredictionScreen({super.key});
-
+ 
   @override
   State<PredictionScreen> createState() => _PredictionScreenState();
 }
-
+ 
 class _PredictionScreenState extends State<PredictionScreen> {
   final TflitePredictionService _service = TflitePredictionService();
   final _formKey = GlobalKey<FormState>();
-
+ 
   final _ph = _NumSpec("pH du sol", 4.5, 8.5);
   final _moisture = _NumSpec("Humidité sol", 10, 60, suffix: "%");
   final _carbon = _NumSpec("Carbone org.", 0.2, 1.5, suffix: "%");
@@ -90,7 +94,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
   final _temp = _NumSpec("Température", 10, 40, suffix: "°C");
   final _humidity = _NumSpec("Humidité air", 30, 90, suffix: "%");
   final _rain = _NumSpec("Pluie", 200, 3000, suffix: "mm");
-
+ 
   SoilType _soil = SoilType.loamy;
   PlantationType _crop = PlantationType.mais;
   GrowthStage _stage = GrowthStage.vegetative;
@@ -98,12 +102,12 @@ class _PredictionScreenState extends State<PredictionScreen> {
   IrrigationType _irrigation = IrrigationType.rainfed;
   PreviousCrop _previous = PreviousCrop.maize;
   Region _region = Region.central;
-
+ 
   bool _loading = false;
-
+ 
   List<_NumSpec> get _allNum =>
       [_ph, _moisture, _carbon, _ec, _n, _p, _k, _temp, _humidity, _rain];
-
+ 
   @override
   void dispose() {
     for (final s in _allNum) {
@@ -112,12 +116,12 @@ class _PredictionScreenState extends State<PredictionScreen> {
     _service.dispose();
     super.dispose();
   }
-
+ 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
-
+ 
     try {
       final input = FertilizerInput(
         soilType: _soil,
@@ -138,11 +142,20 @@ class _PredictionScreenState extends State<PredictionScreen> {
         previousCrop: _previous,
         region: _region,
       );
-
+ 
       final result = await _service.predict(input);
       // L'inférence est quasi instantanée : on laisse le spinner visible un instant.
       await Future<void>.delayed(const Duration(milliseconds: 700));
-
+ 
+      await HistoryService.addEntry(HistoryEntry(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: HistoryEntryType.prediction,
+        title: "Engrais recommandé : ${result.fertilizerName}",
+        subtitle: "Culture : ${_crop.label}"
+            "${result.confidence != null ? ' · Confiance ${(result.confidence! * 100).toStringAsFixed(0)}%' : ''}",
+        date: DateTime.now(),
+      ));
+ 
       if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => PredictionResultScreen(result: result)),
@@ -160,7 +173,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
       if (mounted) setState(() => _loading = false);
     }
   }
-
+ 
   // ───────────── Briques de formulaire compactes ─────────────
   InputDecoration _dec(String label, {String? suffix}) {
     OutlineInputBorder border(Color c, [double w = 1]) => OutlineInputBorder(
@@ -183,7 +196,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
       focusedErrorBorder: border(AppColors.rust, 1.6),
     );
   }
-
+ 
   Widget _num(_NumSpec s) {
     return TextFormField(
       controller: s.ctrl,
@@ -194,7 +207,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
       validator: s.validate,
     );
   }
-
+ 
   Widget _dropdown<T>({
     required String label,
     required T value,
@@ -217,7 +230,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
       },
     );
   }
-
+ 
   Widget _row(List<Widget> children) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,7 +242,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
       ],
     );
   }
-
+ 
   Widget _caption(String text) {
     return Padding(
       padding: const EdgeInsets.only(top: 12, bottom: 6),
@@ -244,7 +257,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
       ),
     );
   }
-
+ 
   // Bouton qui se transforme en cercle avec un spinner pendant l'inférence.
   Widget _submitButton() {
     const size = 52.0;
@@ -294,7 +307,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
       },
     );
   }
-
+ 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
