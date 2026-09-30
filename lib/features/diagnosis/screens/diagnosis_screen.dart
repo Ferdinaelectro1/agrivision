@@ -1,52 +1,65 @@
+
+
+
+Diagnosis screen · DART
 // lib/features/diagnosis/screens/diagnosis_screen.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/diagnosis_service.dart';
 import '../services/tflite_diagnosis_service.dart';
-
+import '../../history/services/history_service.dart';
+ 
 class DiagnosisScreen extends StatefulWidget {
   const DiagnosisScreen({super.key});
-
+ 
   @override
   State<DiagnosisScreen> createState() => _DiagnosisScreenState();
 }
-
+ 
 class _DiagnosisScreenState extends State<DiagnosisScreen> {
   final DiagnosisService _service = TFLiteDiagnosisService(); // sera remplacé par le vrai LLM local
   final ImagePicker _picker = ImagePicker();
-
+ 
   File? _selectedImage;
   DiagnosisResult? _result;
   bool _loading = false;
   String? _error;
-
+ 
   Future<void> _pickImage(ImageSource source) async {
     final XFile? picked = await _picker.pickImage(source: source, imageQuality: 85);
     if (picked == null) return;
-
+ 
     setState(() {
       _selectedImage = File(picked.path);
       _result = null;
       _error = null;
     });
-
+ 
     await _analyze();
   }
-
+ 
   Future<void> _analyze() async {
     if (_selectedImage == null) return;
     setState(() { _loading = true; _error = null; });
     try {
       final result = await _service.analyzeImage(_selectedImage!);
       setState(() => _result = result);
+ 
+      await HistoryService.addEntry(HistoryEntry(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: HistoryEntryType.diagnosis,
+        title: result.diseaseName,
+        subtitle: "Confiance ${(result.confidence * 100).toStringAsFixed(0)}%",
+        date: DateTime.now(),
+      ));
     } catch (e) {
       setState(() => _error = "Erreur lors de l'analyse. Réessaie.");
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
-
+ 
   void _showSourcePicker() {
     showModalBottomSheet(
       context: context,
@@ -74,7 +87,7 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
       ),
     );
   }
-
+ 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -117,11 +130,11 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
     );
   }
 }
-
+ 
 class _DiagnosisResultCard extends StatelessWidget {
   final DiagnosisResult result;
   const _DiagnosisResultCard({required this.result});
-
+ 
   @override
   Widget build(BuildContext context) {
     return Card(
