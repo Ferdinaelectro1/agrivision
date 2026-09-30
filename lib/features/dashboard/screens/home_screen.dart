@@ -7,6 +7,8 @@ import '../../prediction/screens/prediction_screen.dart';
 import '../../history/screens/history_screen.dart';
 import '../../bug_report/screens/bug_report_screen.dart';
 
+const _kLogoAsset = 'assets/icons/app_icon_without_bg.png';
+
 class HomeScreen extends StatelessWidget {
   final AuthService authService;
   const HomeScreen({super.key, required this.authService});
@@ -23,19 +25,36 @@ class HomeScreen extends StatelessWidget {
             expandedHeight: 130,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
+              centerTitle: false,
               titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
-              title: const Text(
-                "AgriVision",
-                style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.2,color: Colors.white),
-              ),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppColors.forest, AppColors.forestLight],
+              title: const _AppLogoTitle(),
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [AppColors.forest, AppColors.forestLight],
+                      ),
+                    ),
                   ),
-                ),
+                  // Filigrane discret du logo dans le coin du bandeau
+                  Positioned(
+                    right: -10,
+                    bottom: -20,
+                    child: Opacity(
+                      opacity: 0.30,
+                      child: Image.asset(
+                        _kLogoAsset,
+                        width: 150,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             actions: [
@@ -104,6 +123,45 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// Logo dans un petit badge "verre" + nom de l'app
+class _AppLogoTitle extends StatelessWidget {
+  const _AppLogoTitle();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.16),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withOpacity(0.28), width: 1),
+          ),
+          child: Image.asset(
+            _kLogoAsset,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) =>
+                const Icon(Icons.eco_rounded, color: Colors.white, size: 18),
+          ),
+        ),
+        const SizedBox(width: 10),
+        const Text(
+          "AgriVision",
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+            color: Colors.white,
+          ),
+        ),
+      ],
     );
   }
 }

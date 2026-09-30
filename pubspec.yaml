@@ -54,9 +54,21 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
   tflite_flutter: ^0.11.0
+  flutter_native_splash: ^2.4.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec  
+
+flutter_native_splash:
+  color: "#1F3D2B"
+  image: assets/icons/splash_logo.png
+  color_dark: "#1F3D2B"
+  image_dark: assets/icons/splash_logo.png
+  android_12:
+    color: "#1F3D2B"
+    image: assets/icons/splash_logo.png
+    color_dark: "#1F3D2B"
+    image_dark: assets/icons/splash_logo.png
 
 flutter_launcher_icons:
   android: true
@@ -67,9 +79,10 @@ flutter_launcher_icons:
 flutter:
   assets:
     - assets/images/logo.png
-    - assets/model/plant_disease_model.tflite
+    - assets/model/agrivision_fertilizer_model.tflite
     - assets/model/labels.txt
     - assets/icons/google_logo.svg
+    - assets/icons/app_icon_without_bg.png
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
