@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../services/bug_report_service.dart';
-import '../services/fake_bug_report_service.dart';
+import '../services/firebase_bug_report_service.dart';
 
 class BugReportScreen extends StatefulWidget {
   const BugReportScreen({super.key});
@@ -12,7 +12,7 @@ class BugReportScreen extends StatefulWidget {
 }
 
 class _BugReportScreenState extends State<BugReportScreen> {
-  final BugReportService _service = FakeBugReportService(); // remplacé par l'impl Firestore plus tard
+  final BugReportService _service = FirebaseBugReportService(); // remplacé par l'impl Firestore plus tard
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
@@ -23,6 +23,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
   String? _error;
 
   Future<void> _submit() async {
+    if (_loading) return; // évite le double envoi
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
 
@@ -32,9 +33,12 @@ class _BugReportScreenState extends State<BugReportScreen> {
         description: _descCtrl.text.trim(),
         severity: _severity,
       );
+      if (!mounted) return;
       setState(() => _sent = true);
     } catch (e) {
-      setState(() => _error = "Échec de l'envoi. Réessaie.");
+      debugPrint('Bug report error: $e');
+      if (!mounted) return;
+      setState(() => _error = "Échec de l'envoi. Vérifiez votre connexion et réessayez.");
     } finally {
       if (mounted) setState(() => _loading = false);
     }
