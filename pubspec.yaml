@@ -85,6 +85,8 @@ flutter:
     - assets/model/labels.txt
     - assets/icons/google_logo.svg
     - assets/icons/app_icon_without_bg.png
+    - assets/model/plant_disease.tflite
+    - assets/model/labels.json
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
