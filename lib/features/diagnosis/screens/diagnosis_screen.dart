@@ -53,22 +53,33 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
       _loading = true;
       _error = null;
     });
-    try {
-      final result = await _service.analyzeImage(_selectedImage!);
-      setState(() => _result = result);
 
-      await HistoryService.addEntry(HistoryEntry(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        type: HistoryEntryType.diagnosis,
-        title: result.diseaseName,
-        subtitle: "Confiance ${(result.confidence * 100).toStringAsFixed(0)}%",
-        date: DateTime.now(),
-      ));
-    } catch (e) {
-      setState(() => _error = "Erreur lors de l'analyse. Réessaie.");
-    } finally {
-      if (mounted) setState(() => _loading = false);
+    DiagnosisResult? result;
+    try {
+      result = await _service.analyzeImage(_selectedImage!);
+      setState(() => _result = result);
+    } catch (e, st) {
+      debugPrint('ANALYSE ERREUR: $e\n$st');
+      // TEMPORAIRE : affiche la vraie erreur pour le test en release
+      setState(() => _error = "Analyse : $e");
     }
+
+    if (result != null) {
+      try {
+        await HistoryService.addEntry(HistoryEntry(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          type: HistoryEntryType.diagnosis,
+          title: result.diseaseName,
+          subtitle: "Confiance ${(result.confidence * 100).toStringAsFixed(0)}%",
+          date: DateTime.now(),
+        ));
+      } catch (e, st) {
+        // L'historique ne doit pas bloquer l'affichage du résultat
+        debugPrint('HISTORIQUE ERREUR: $e\n$st');
+      }
+    }
+
+    if (mounted) setState(() => _loading = false);
   }
 
   void _showSourcePicker() {
